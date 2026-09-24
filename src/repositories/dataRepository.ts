@@ -180,14 +180,60 @@ export class ClassRepository {
   }
 
   public static async deleteClass(id: string): Promise<void> {
-    const docPath = `classes/${id}`;
+    const classCollections = [
+      'students',
+      'parentContacts',
+      'attendanceRecords',
+      'assessments',
+      'competencyEvaluations',
+      'competitionEntries',
+      'tasks',
+      'taskCompletions',
+      'parentInteractions',
+      'journalEntries',
+      'classEvents',
+      'timetable',
+      'seatingAssignments',
+      'attentionSignals',
+    ];
+
     if (shouldUseFirestore()) {
       try {
+        // 1. Cascade delete all dependent records across all collections
+        for (const col of classCollections) {
+          try {
+            const q = query(collection(db, col), where('classId', '==', id));
+            const snap = await getDocs(q);
+            if (!snap.empty) {
+              const docsToDelete = snap.docs;
+              for (let i = 0; i < docsToDelete.length; i += 400) {
+                const chunk = docsToDelete.slice(i, i + 400);
+                const batch = writeBatch(db);
+                chunk.forEach((d) => batch.delete(d.ref));
+                await batch.commit();
+              }
+            }
+          } catch (colErr) {
+            console.warn(`[CascadeDelete] Warning cleaning ${col} for class ${id}:`, colErr);
+          }
+        }
+
+        // 2. Delete the root class document
+        const docPath = `classes/${id}`;
         await deleteDoc(doc(db, 'classes', id));
         return;
       } catch (error) {
-        handleFirestoreError(error, OperationType.DELETE, docPath);
+        handleFirestoreError(error, OperationType.DELETE, `classes/${id}`);
       }
+    }
+
+    // Cascade delete in localDb
+    for (const col of classCollections) {
+      const remaining = localDb.getCollection<{ id: string; classId?: string }>(
+        col,
+        (item) => item.classId !== id
+      );
+      localDb.setCollection(col, remaining);
     }
     localDb.deleteItem('classes', id);
   }
@@ -288,15 +334,23 @@ export class StudentRepository {
           'competitionEntries',
           'taskCompletions',
           'parentInteractions',
+          'seatingAssignments',
+          'attentionSignals',
         ];
 
         for (const col of subCollections) {
           try {
             const q = query(collection(db, col), where('studentId', '==', id));
             const snap = await getDocs(q);
-            const batch = writeBatch(db);
-            snap.forEach((d) => batch.delete(d.ref));
-            await batch.commit();
+            if (!snap.empty) {
+              const docsToDelete = snap.docs;
+              for (let i = 0; i < docsToDelete.length; i += 400) {
+                const chunk = docsToDelete.slice(i, i + 400);
+                const batch = writeBatch(db);
+                chunk.forEach((d) => batch.delete(d.ref));
+                await batch.commit();
+              }
+            }
           } catch (e) {
             console.warn(`Cascade delete warning for ${col}:`, e);
           }
@@ -317,6 +371,8 @@ export class StudentRepository {
       'competitionEntries',
       'taskCompletions',
       'parentInteractions',
+      'seatingAssignments',
+      'attentionSignals',
     ];
     subCollections.forEach((col) => {
       const remaining = localDb.getCollection<{ id: string; studentId?: string }>(col, (item) => item.studentId !== id);

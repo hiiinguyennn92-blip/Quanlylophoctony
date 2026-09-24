@@ -76,6 +76,8 @@ export interface AICommentResponse {
   };
   evidenceUsed: string[];
   missingInformation: string[];
+  status: 'success' | 'insufficient_data' | 'ai_unavailable' | 'invalid_output';
+  retryable: boolean;
 }
 
 export async function generateComment(params: AICommentRequest): Promise<AICommentResponse> {
@@ -174,57 +176,54 @@ Chỉ trả về JSON hợp lệ, không bọc markdown thừa.
     const text = response.text || '{}';
     const parsed = JSON.parse(text);
 
+    if (!parsed.comment) {
+      throw new Error('AI output missing comment field');
+    }
+
     return {
-      comment: parsed.comment || `Em ${studentName} có nhiều nỗ lực trong học tập, tiếp thu bài tốt. Thầy/Cô mong em tiếp tục giữ vững tinh thần chăm chỉ này nhé!`,
+      status: 'success',
+      retryable: false,
+      comment: parsed.comment,
       toneUsed: parsed.toneUsed || chosenToneKey,
-      alternativeVersions: Array.isArray(parsed.alternativeVersions) ? parsed.alternativeVersions : [
-        {
-          tone: 'formal_tt27',
-          label: 'Chuẩn mực Thông tư 27',
-          comment: `Em ${studentName} đạt mức ${levelText}. ${safeParams.strengths ? `Ưu điểm: ${safeParams.strengths}. ` : ''}${safeParams.improvements ? `Cần khắc phục: ${safeParams.improvements}.` : 'Tiếp tục rèn luyện và phát huy.'}`,
-        },
-        {
-          tone: 'concise',
-          label: 'Súc tích ngắn gọn',
-          comment: `Em ${studentName} chăm ngoan, tiếp thu bài tốt. Cần phát huy hơn nữa tính chủ động trong giờ học.`,
-        },
-      ],
+      alternativeVersions: Array.isArray(parsed.alternativeVersions) ? parsed.alternativeVersions : [],
       competencyAnalysis: parsed.competencyAnalysis || {
-        canDo: safeParams.strengths || 'Nắm được các kiến thức cơ bản trong bài học.',
-        needImprovement: safeParams.improvements || 'Cần chú ý cẩn thận hơn khi làm bài.',
-        actionPlan: 'Gia đình cùng giáo viên động viên và theo dõi tiến độ hoàn thành bài tập của em.',
-        competenciesTagged: Array.isArray(safeParams.targetCompetencies) ? safeParams.targetCompetencies : ['Tự chủ và tự học'],
-        qualitiesTagged: Array.isArray(safeParams.targetQualities) ? safeParams.targetQualities : ['Chăm chỉ'],
+        canDo: safeParams.strengths || `Hoàn thành yêu cầu ở mức ${levelText}`,
+        needImprovement: safeParams.improvements || 'Tiếp tục rèn luyện theo chương trình.',
+        actionPlan: 'Phối hợp gia đình và giáo viên theo dõi tiến độ học tập.',
+        competenciesTagged: Array.isArray(safeParams.targetCompetencies) ? safeParams.targetCompetencies : [],
+        qualitiesTagged: Array.isArray(safeParams.targetQualities) ? safeParams.targetQualities : [],
       },
-      evidenceUsed: Array.isArray(parsed.evidenceUsed) ? parsed.evidenceUsed : ['Dữ liệu hồ sơ học tập tại chỗ'],
+      evidenceUsed: Array.isArray(parsed.evidenceUsed) ? parsed.evidenceUsed : [levelText],
       missingInformation: Array.isArray(parsed.missingInformation) ? parsed.missingInformation : [],
     };
   } catch (error: any) {
-    console.error('Error generating comment:', error);
+    console.warn('Grounded fallback applied for comment generation:', error?.message || error);
+    const hasEvidence = Boolean(safeParams.strengths || safeParams.improvements);
+    const groundedComment = hasEvidence
+      ? `Học sinh ${studentName} ghi nhận ở mức ${levelText}${safeParams.subject ? ` môn ${safeParams.subject}` : ''}.${safeParams.strengths ? ` Minh chứng quan sát: ${safeParams.strengths}.` : ''}${safeParams.improvements ? ` Điểm cần khắc phục: ${safeParams.improvements}.` : ''}`
+      : `Học sinh ${studentName} ghi nhận ở mức ${levelText}${safeParams.subject ? ` môn ${safeParams.subject}` : ''}. Hiện tại chưa có ghi chú quan sát cụ thể ngoài mức xếp loại để đưa ra nhận xét chi tiết hơn.`;
+
     return {
-      comment: `Em ${studentName} đạt mức ${levelText}${safeParams.subject ? ` môn ${safeParams.subject}` : ''}. ${safeParams.strengths ? `Em có ưu điểm: ${safeParams.strengths}. ` : ''}${safeParams.improvements ? `Cần chú ý thêm: ${safeParams.improvements}.` : 'Em tiếp tục cố gắng phát huy nhé!'}`,
+      status: 'ai_unavailable',
+      retryable: true,
+      comment: groundedComment,
       toneUsed: chosenToneKey,
       alternativeVersions: [
         {
           tone: 'formal_tt27',
-          label: 'Chuẩn mực Thông tư 27',
-          comment: `Học sinh đạt mức ${levelText}. Hoàn thành nhiệm vụ học tập theo yêu cầu cần đạt.`,
-        },
-        {
-          tone: 'concise',
-          label: 'Súc tích ngắn gọn',
-          comment: `Em ${studentName} có ý thức học tập, cần chú ý tính cẩn thận khi làm bài.`,
+          label: 'Chuẩn mực Thông tư 27 (Dữ liệu xác thực)',
+          comment: `Học sinh ${studentName} đạt mức ${levelText}${safeParams.subject ? ` môn ${safeParams.subject}` : ''}.${safeParams.strengths ? ` Quan sát: ${safeParams.strengths}.` : ''}`,
         },
       ],
       competencyAnalysis: {
-        canDo: safeParams.strengths || 'Hoàn thành nhiệm vụ được giao.',
-        needImprovement: safeParams.improvements || 'Rèn luyện thêm tính kiên nhẫn.',
-        actionPlan: 'Phối hợp gia đình nhắc nhở tự học mỗi ngày.',
-        competenciesTagged: ['Tự chủ và tự học'],
-        qualitiesTagged: ['Chăm chỉ'],
+        canDo: safeParams.strengths || `Ghi nhận mức ${levelText}`,
+        needImprovement: safeParams.improvements || 'Theo dõi định kỳ.',
+        actionPlan: 'Giáo viên theo dõi thêm các tiết học tới để bổ sung quan sát thực tế.',
+        competenciesTagged: Array.isArray(safeParams.targetCompetencies) ? safeParams.targetCompetencies : [],
+        qualitiesTagged: Array.isArray(safeParams.targetQualities) ? safeParams.targetQualities : [],
       },
-      evidenceUsed: ['Dữ liệu hồ sơ học sinh'],
-      missingInformation: ['Hệ thống AI xử lý nội bộ an toàn.'],
+      evidenceUsed: [safeParams.strengths, safeParams.improvements, levelText].filter(Boolean) as string[],
+      missingInformation: !hasEvidence ? ['Chưa có ghi chép quan sát cụ thể từ giáo viên.'] : [],
     };
   }
 }
@@ -242,6 +241,8 @@ export interface AICompetencyBatchRequest {
 export interface AICompetencyBatchResponse {
   evaluations: Record<string, { level: 'Tốt' | 'Đạt' | 'Cần cố gắng'; note: string; actionHint: string }>;
   overallMindsetSummary: string;
+  status: 'success' | 'insufficient_data' | 'ai_unavailable' | 'invalid_output';
+  retryable: boolean;
 }
 
 export async function generateCompetencyBatchRecommendation(
@@ -254,9 +255,9 @@ DỮ LIỆU HỌC SINH:
 - Tên: ${params.studentName}
 - Khối lớp: ${params.grade || 'Tiểu học'}
 - Giai đoạn đánh giá: ${params.period}
-- Ghi chú giáo viên về học sinh: ${params.studentNotes || 'Ngoan ngoãn, hoàn thành bài tập'}
-- Tình hình học tập gần đây: ${params.recentAssessmentLevels || 'Mức Hoàn thành / Hoàn thành tốt'}
-- Chuyên cần: ${params.attendanceRecord || 'Đi học đều, đúng giờ'}
+- Ghi chú giáo viên về học sinh: ${params.studentNotes || 'Chưa có ghi chép cụ thể'}
+- Tình hình học tập gần đây: ${params.recentAssessmentLevels || 'Chưa có dữ liệu'}
+- Chuyên cần: ${params.attendanceRecord || 'Chưa có dữ liệu'}
 
 DANH SÁCH 10 TIÊU CHÍ CẦN ĐÁNH GIÁ (BẮT BUỘC ĐẦY ĐỦ):
 1. Tự chủ và tự học
@@ -306,31 +307,27 @@ Xuất ra JSON:
     });
 
     const parsed = JSON.parse(response.text || '{}');
-    return {
-      evaluations: parsed.evaluations || {},
-      overallMindsetSummary:
-        parsed.overallMindsetSummary ||
-        `Em ${params.studentName} có sự phát triển hài hòa về phẩm chất và năng lực, luôn chăm ngoan và sẵn lòng giúp đỡ bạn bè.`,
-    };
-  } catch (error) {
-    console.error('Error in batch competency recommendation:', error);
-    // Safe deterministic fallback
-    const defaultEvals: Record<string, { level: 'Tốt' | 'Đạt' | 'Cần cố gắng'; note: string; actionHint: string }> = {
-      'Tự chủ và tự học': { level: 'Tốt', note: 'Em tự giác chuẩn bị sách vở và hoàn thành bài tập chu đáo.', actionHint: 'Tiếp tục phát huy thói quen tự học mỗi tối.' },
-      'Giao tiếp và hợp tác': { level: 'Đạt', note: 'Biết chia sẻ và phối hợp cùng bạn trong các hoạt động nhóm.', actionHint: 'Khích lệ em tự tin phát biểu trước đám đông hơn.' },
-      'Giải quyết vấn đề và sáng tạo': { level: 'Đạt', note: 'Biết đặt câu hỏi và tìm cách xử lý các bài toán cơ bản.', actionHint: 'Tạo cơ hội để em thử sức với các bài tập vận dụng.' },
-      'Năng lực ngôn ngữ': { level: 'Tốt', note: 'Đọc diễn cảm, chữ viết gọn gàng, diễn đạt ý rõ ràng.', actionHint: 'Động viên em đọc thêm sách thiếu nhi mỗi tuần.' },
-      'Năng lực tính toán': { level: 'Đạt', note: 'Thực hiện đúng các phép tính cơ bản đã học.', actionHint: 'Rèn thêm kỹ năng tính toán cẩn thận.' },
-      'Yêu nước': { level: 'Tốt', note: 'Nghiêm túc trong giờ chào cờ, yêu quý trường lớp.', actionHint: 'Tuyên dương trước lớp.' },
-      'Nhân ái': { level: 'Tốt', note: 'Hòa đồng, biết yêu thương và chia sẻ đồ dùng với bạn bè.', actionHint: 'Giữ gìn tinh thần nhân văn tốt đẹp.' },
-      'Chăm chỉ': { level: 'Tốt', note: 'Đi học đúng giờ, chăm chỉ lắng nghe bài giảng.', actionHint: 'Biểu dương tinh thần chuyên cần.' },
-      'Trung thực': { level: 'Tốt', note: 'Thật thà, trung thực trong học tập và sinh hoạt lớp.', actionHint: 'Tạo niềm tin cho học sinh.' },
-      'Trách nhiệm': { level: 'Tốt', note: 'Có ý thức giữ gìn vệ sinh chung, bảo quản đồ dùng học tập.', actionHint: 'Giao thêm các nhiệm vụ tự quản nhỏ.' },
-    };
+    if (!parsed.evaluations || typeof parsed.evaluations !== 'object') {
+      throw new Error('AI output missing evaluations');
+    }
 
     return {
-      evaluations: defaultEvals,
-      overallMindsetSummary: `Em ${params.studentName} duy trì nền nếp học tập tốt, có ý thức kỷ luật và tình cảm chan hòa với bạn bè.`,
+      status: 'success',
+      retryable: false,
+      evaluations: parsed.evaluations,
+      overallMindsetSummary:
+        parsed.overallMindsetSummary ||
+        `Đánh giá năng lực - phẩm chất học sinh ${params.studentName} giai đoạn ${params.period}.`,
+    };
+  } catch (error) {
+    console.warn('Grounded fallback for competency batch:', error);
+    // Grounded fallback: do not invent fake behavioral claims for 10 criteria
+    return {
+      status: 'ai_unavailable',
+      retryable: true,
+      evaluations: {},
+      overallMindsetSummary:
+        'Hệ thống AI không phản hồi kịp thời. Nhằm đảm bảo tính khách quan và chuẩn mực sư phạm theo Thông tư 27, hệ thống không tự động điền nhận xét giả định cho 10 tiêu chí khi chưa có phản hồi chính thức.',
     };
   }
 }
@@ -478,36 +475,45 @@ Yêu cầu xuất ra JSON:
     });
 
     const parsed = JSON.parse(response.text || '{}');
-    const summaryText = parsed.summary || parsed.summaryReport || 'Lớp duy trì nền nếp học tập và kỷ luật tương đối tốt trong tuần.';
+    const summaryText =
+      parsed.summary ||
+      parsed.summaryReport ||
+      `Trong ${weekOrPeriod}, lớp ${className} ghi nhận chuyên cần ${presentRate}%.`;
     return {
       summary: summaryText,
       summaryReport: summaryText,
-      highlights: Array.isArray(parsed.highlights) && parsed.highlights.length > 0
-        ? parsed.highlights
-        : ['Tỷ lệ chuyên cần đạt mức ổn định', 'Học sinh tích cực tham gia các phong trào'],
-      areasToImprove: Array.isArray(parsed.areasToImprove) && parsed.areasToImprove.length > 0
-        ? parsed.areasToImprove
-        : ['Nhắc nhở một số học sinh hoàn thành bài tập đúng hạn'],
-      recommendations: Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0
-        ? parsed.recommendations
-        : ['Tiếp tục biểu dương các tổ có thành tích tốt', 'Liên hệ phụ huynh các em vắng nhiều'],
+      highlights:
+        Array.isArray(parsed.highlights) && parsed.highlights.length > 0
+          ? parsed.highlights
+          : [`Chuyên cần ghi nhận: ${presentRate}%`, `Nhiệm vụ: ${completedTasksCount}/${totalTasksCount} hoàn thành`],
+      areasToImprove:
+        Array.isArray(parsed.areasToImprove) && parsed.areasToImprove.length > 0
+          ? parsed.areasToImprove
+          : unexcusedCount > 0
+          ? [`Theo dõi ${unexcusedCount} trường hợp vắng không phép.`]
+          : ['Duy trì nề nếp và hoàn thành bài tập đúng hạn.'],
+      recommendations:
+        Array.isArray(parsed.recommendations) && parsed.recommendations.length > 0
+          ? parsed.recommendations
+          : ['Tiếp tục phối hợp gia đình theo dõi chuyên cần học sinh.'],
     };
   } catch (error) {
-    console.error('Error generating class summary:', error);
-    const fallbackSummary = `Trong ${weekOrPeriod}, lớp ${className} (sĩ số ${totalStudents}) duy trì tỷ lệ chuyên cần đạt ${presentRate}%. ${params.attendanceStats ? params.attendanceStats + '. ' : ''}${topGroupsStr !== 'Chưa ghi nhận' ? 'Thi đua: ' + topGroupsStr + '. ' : ''}Học sinh tích cực hoàn thành các nhiệm vụ học tập được giao.`;
+    console.warn('Grounded fallback for class summary:', error);
+    const fallbackSummary = `Trong ${weekOrPeriod}, lớp ${className} (sĩ số ${totalStudents}) ghi nhận chuyên cần ${presentRate}%. Vắng có phép: ${excusedCount}, không phép: ${unexcusedCount}. Hoàn thành nhiệm vụ: ${completedTasksCount}/${totalTasksCount}.${topGroupsStr !== 'Chưa ghi nhận' ? ' Tổ dẫn đầu: ' + topGroupsStr + '.' : ''}`;
     return {
       summary: fallbackSummary,
       summaryReport: fallbackSummary,
       highlights: [
-        `Tỷ lệ đi học chuyên cần: ${presentRate}%`,
-        topGroupsList.length > 0 ? `Tổ xuất sắc: ${topGroupsList.join(', ')}` : 'Nền nếp lớp giữ vững',
+        `Chuyên cần: ${presentRate}% (${excusedCount} có phép, ${unexcusedCount} không phép)`,
+        `Tiến độ nhiệm vụ: ${completedTasksCount}/${totalTasksCount} đã hoàn thành`,
+        ...(topGroupsList.length > 0 ? [`Tổ dẫn đầu thi đua: ${topGroupsList.join(', ')}`] : []),
       ],
       areasToImprove: [
         unexcusedCount > 0
-          ? `Có ${unexcusedCount} lượt nghỉ không phép cần chấn chỉnh`
-          : 'Duy trì giờ giấc ra vào lớp',
+          ? `Có ${unexcusedCount} lượt nghỉ không phép cần liên hệ phụ huynh xác minh.`
+          : 'Duy trì giờ giấc ra vào lớp và nề nếp truy bài đầu giờ.',
       ],
-      recommendations: ['Động viên học sinh tiếp tục thi đua trong tuần kế tiếp.'],
+      recommendations: ['Đôn đốc học sinh hoàn thành bài tập và chuẩn bị bài cho tuần kế tiếp.'],
     };
   }
 }

@@ -8,6 +8,7 @@ import {
   generateBirthdayWish,
   generateCompetencyBatchRecommendation,
 } from './aiEndpoints.ts';
+import { verifyToken, verifyClassOwnership } from './authMiddleware.ts';
 
 export function aiApiPlugin(): Plugin {
   return {
@@ -27,6 +28,43 @@ export function aiApiPlugin(): Plugin {
           return;
         }
 
+        // Security Barrier: Verify Firebase Token
+        const authHeader = req.headers.authorization || (req.headers as any).Authorization;
+        if (!authHeader || typeof authHeader !== 'string') {
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              error: 'Yêu cầu bị từ chối: Thiếu mã xác thực (Missing Authorization header).',
+              code: 'AUTH_REQUIRED',
+            })
+          );
+          return;
+        }
+
+        const parts = authHeader.trim().split(' ');
+        if (parts.length !== 2 || parts[0].toLowerCase() !== 'bearer') {
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              error: 'Yêu cầu bị từ chối: Định dạng Bearer không hợp lệ.',
+              code: 'AUTH_MALFORMED',
+            })
+          );
+          return;
+        }
+
+        const user = await verifyToken(parts[1]);
+        if (!user) {
+          res.statusCode = 401;
+          res.end(
+            JSON.stringify({
+              error: 'Yêu cầu bị từ chối: Token xác thực không hợp lệ hoặc đã hết hạn.',
+              code: 'AUTH_INVALID_TOKEN',
+            })
+          );
+          return;
+        }
+
         let body = '';
         req.on('data', (chunk) => {
           body += chunk;
@@ -36,6 +74,22 @@ export function aiApiPlugin(): Plugin {
           try {
             const data = body ? JSON.parse(body) : {};
             const pathname = req.url?.split('?')[0];
+
+            // Verify class ownership if classId is provided
+            const requestedClassId = data.classId || data.contextData?.classId;
+            if (requestedClassId) {
+              const hasAccess = await verifyClassOwnership(user, parts[1], requestedClassId);
+              if (!hasAccess) {
+                res.statusCode = 403;
+                res.end(
+                  JSON.stringify({
+                    error: 'Từ chối quyền truy cập: Bạn không có quyền truy cập lớp học này.',
+                    code: 'FORBIDDEN_RESOURCE',
+                  })
+                );
+                return;
+              }
+            }
 
             if (pathname === '/api/ai/comment') {
               const result = await generateComment(data);

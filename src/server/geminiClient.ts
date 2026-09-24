@@ -2,8 +2,8 @@ import { GoogleGenAI } from '@google/genai';
 
 let aiInstance: GoogleGenAI | null = null;
 
-export const PRIMARY_MODEL = 'gemini-3.6-flash';
-export const FALLBACK_MODELS = ['gemini-3.1-flash-lite', 'gemini-3.8-flash'];
+export const PRIMARY_MODEL = 'gemini-3.8-flash';
+export const FALLBACK_MODELS = ['gemini-3.1-flash-lite', 'gemini-flash-latest'];
 
 export function getGeminiClient(): GoogleGenAI {
   if (!aiInstance) {
@@ -27,6 +27,11 @@ export function getGeminiClient(): GoogleGenAI {
 export async function generateContentWithRetry(
   request: Parameters<GoogleGenAI['models']['generateContent']>[0]
 ): Promise<ReturnType<GoogleGenAI['models']['generateContent']>> {
+  const apiKey = process.env.GEMINI_API_KEY || '';
+  if (!apiKey) {
+    throw new Error('GEMINI_API_KEY is not configured or available.');
+  }
+
   const ai = getGeminiClient();
   const requestedModel = request.model || PRIMARY_MODEL;
 
@@ -39,10 +44,16 @@ export async function generateContentWithRetry(
 
   for (const modelName of modelsToTry) {
     try {
-      const response = await ai.models.generateContent({
-        ...request,
-        model: modelName,
-      });
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error(`Model ${modelName} request timed out (5s).`)), 5000)
+      );
+      const response = (await Promise.race([
+        ai.models.generateContent({
+          ...request,
+          model: modelName,
+        }),
+        timeoutPromise,
+      ])) as any;
       return response;
     } catch (err: any) {
       lastError = err;
@@ -62,7 +73,7 @@ export async function generateContentWithRetry(
       if (isTemporary) {
         console.warn(`Model ${modelName} temporary spike/unavailable (${errStatus}): trying next model...`);
         // Short pause to allow socket cleanup
-        await new Promise((resolve) => setTimeout(resolve, 300));
+        await new Promise((resolve) => setTimeout(resolve, 100));
         continue;
       }
 
@@ -75,11 +86,17 @@ export async function generateContentWithRetry(
   // If initial failover pass was exhausted due to temporary spikes across all models, do 1 retry with backoff on primary
   try {
     console.warn(`All models experienced spikes, attempting final backoff retry with ${PRIMARY_MODEL}...`);
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    return await ai.models.generateContent({
-      ...request,
-      model: PRIMARY_MODEL,
-    });
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    const timeoutPromise = new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`Final retry timed out (5s).`)), 5000)
+    );
+    return (await Promise.race([
+      ai.models.generateContent({
+        ...request,
+        model: PRIMARY_MODEL,
+      }),
+      timeoutPromise,
+    ])) as any;
   } catch (finalErr: any) {
     throw lastError || finalErr || new Error('Hệ thống AI hiện đang có lượng truy cập cao. Xin vui lòng thử lại sau giây lát.');
   }

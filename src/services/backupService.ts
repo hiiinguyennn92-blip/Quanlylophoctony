@@ -114,18 +114,48 @@ export class BackupService {
 
   public static validateBackupFile(content: string): { valid: boolean; summary?: any; error?: string } {
     try {
+      if (!content || typeof content !== 'string') {
+        return { valid: false, error: 'Dữ liệu tệp trống hoặc không đúng định dạng chuỗi.' };
+      }
       const data = JSON.parse(content);
       if (!data || typeof data !== 'object') {
         return { valid: false, error: 'Tệp không phải định dạng JSON hợp lệ.' };
       }
-      if (!data.schemaVersion || !data.classes || !Array.isArray(data.classes)) {
-        return { valid: false, error: 'Cấu trúc tệp sao lưu không đúng định dạng chuẩn hệ thống.' };
+      if (!data.schemaVersion || typeof data.schemaVersion !== 'string') {
+        return { valid: false, error: 'Tệp thiếu thông tin phiên bản cấu trúc (schemaVersion).' };
+      }
+      if (!data.classes || !Array.isArray(data.classes)) {
+        return { valid: false, error: 'Cấu trúc tệp sao lưu không đúng: thiếu danh sách lớp học (classes).' };
+      }
+      for (const [idx, cls] of data.classes.entries()) {
+        if (!cls || typeof cls !== 'object' || !cls.className) {
+          return { valid: false, error: `Lớp thứ ${idx + 1} trong tệp không hợp lệ: thiếu tên lớp.` };
+        }
+      }
+
+      const arrayFields = [
+        'students',
+        'parentContacts',
+        'attendanceRecords',
+        'assessments',
+        'competencies',
+        'competitionEntries',
+        'tasks',
+        'taskCompletions',
+        'parentInteractions',
+        'journalEntries',
+        'classEvents',
+      ];
+      for (const field of arrayFields) {
+        if (data[field] !== undefined && !Array.isArray(data[field])) {
+          return { valid: false, error: `Trường dữ liệu ${field} không hợp lệ (yêu cầu dạng mảng).` };
+        }
       }
 
       return {
         valid: true,
         summary: {
-          exportedAt: data.exportedAt,
+          exportedAt: data.exportedAt || new Date().toISOString(),
           schemaVersion: data.schemaVersion,
           classCount: data.classes.length,
           studentCount: Array.isArray(data.students) ? data.students.length : 0,
@@ -134,7 +164,7 @@ export class BackupService {
         },
       };
     } catch (e: any) {
-      return { valid: false, error: 'Không thể đọc tệp JSON: ' + (e.message || 'Lỗi cú pháp') };
+      return { valid: false, error: 'Không thể đọc tệp JSON: ' + (e.message || 'Lỗi cú pháp JSON') };
     }
   }
 

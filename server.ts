@@ -11,6 +11,11 @@ import {
   askAIAssistant,
   generateBirthdayWish,
 } from './src/server/aiEndpoints.ts';
+import {
+  requireFirebaseAuth,
+  requireResourceOwnership,
+  AuthenticatedRequest,
+} from './src/server/authMiddleware.ts';
 
 dotenv.config();
 
@@ -47,12 +52,20 @@ app.use((req, res, next) => {
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
-// Anti-DDoS & IP Rate Limiting for AI endpoints (Sliding window with auto-pruning)
+// Authentication & Token Verification Barrier for all AI endpoints
+app.use('/api/ai/', (req, res, next) => {
+  requireFirebaseAuth(req as AuthenticatedRequest, res, () => {
+    requireResourceOwnership(req as AuthenticatedRequest, res, next);
+  });
+});
+
+// Anti-DDoS & Per-User Rate Limiting for AI endpoints (Sliding window with auto-pruning)
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
-const MAX_REQUESTS_PER_WINDOW = 60; // 60 requests/minute per client
+const MAX_TEACHER_REQUESTS_PER_WINDOW = 60; // 60 requests/minute for authenticated teachers
+const MAX_GUEST_REQUESTS_PER_WINDOW = 25; // 25 requests/minute for demo/preview users
 
-// Periodic cleanup to prevent memory leaks from inactive IPs
+// Periodic cleanup to prevent memory leaks from inactive sessions
 setInterval(() => {
   const now = Date.now();
   for (const [key, record] of rateLimitMap.entries()) {
@@ -62,19 +75,25 @@ setInterval(() => {
   }
 }, 5 * 60 * 1000);
 
-app.use('/api/ai/', (req, res, next) => {
-  const ip = req.ip || req.socket.remoteAddress || 'unknown-client';
+app.use('/api/ai/', (req: AuthenticatedRequest, res, next) => {
+  const user = req.user;
+  const rateKey = user?.uid ? (user.isGuest ? `guest:${user.uid}` : `teacher:${user.uid}`) : (req.ip || 'unknown-client');
+  const maxLimit = user?.isGuest ? MAX_GUEST_REQUESTS_PER_WINDOW : MAX_TEACHER_REQUESTS_PER_WINDOW;
+
   const now = Date.now();
-  const record = rateLimitMap.get(ip);
+  const record = rateLimitMap.get(rateKey);
 
   if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
+    rateLimitMap.set(rateKey, { count: 1, resetTime: now + RATE_LIMIT_WINDOW_MS });
     return next();
   }
 
-  if (record.count >= MAX_REQUESTS_PER_WINDOW) {
+  if (record.count >= maxLimit) {
     return res.status(429).json({
-      error: 'Hệ thống đang tiếp nhận quá nhiều yêu cầu từ thiết bị của bạn. Vui lòng thử lại sau 1 phút.',
+      error: user?.isGuest
+        ? 'Bản dùng thử đã đạt giới hạn tần suất yêu cầu AI (25 lần/phút). Vui lòng đăng nhập tài khoản Google giáo viên để nâng hạn mức.'
+        : 'Tài khoản của Thầy/Cô đang gửi nhiều yêu cầu liên tục. Vui lòng thử lại sau 30 giây.',
+      code: 'RATE_LIMIT_EXCEEDED',
     });
   }
 
