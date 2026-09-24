@@ -1,0 +1,6 @@
+{
+  "name": "Trợ Lý Chủ Nhiệm AI",
+  "description": "Quản lý lớp học thông minh, nhẹ việc chủ nhiệm mỗi ngày dành cho giáo viên tiểu học.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

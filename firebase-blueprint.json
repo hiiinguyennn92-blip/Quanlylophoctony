@@ -1,0 +1,432 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "User profile for teachers",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string" },
+        "displayName": { "type": "string" },
+        "email": { "type": "string" },
+        "role": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["uid", "email"]
+    },
+    "Class": {
+      "title": "Class",
+      "description": "Classroom managed by a teacher",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "schoolName": { "type": "string" },
+        "schoolYear": { "type": "string" },
+        "grade": { "type": "string" },
+        "className": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "session": { "type": "string" },
+        "contactInfo": { "type": "string" },
+        "expectedStudentCount": { "type": "number" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["ownerId", "schoolYear", "grade", "className"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Student in a primary classroom",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "studentCode": { "type": "string" },
+        "fullName": { "type": "string" },
+        "dob": { "type": "string" },
+        "gender": { "type": "string" },
+        "address": { "type": "string" },
+        "avatarUrl": { "type": "string" },
+        "groupId": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "fullName"]
+    },
+    "ParentContact": {
+      "title": "ParentContact",
+      "description": "Contact info for a student parent or guardian",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "type": { "type": "string" },
+        "fullName": { "type": "string" },
+        "phone": { "type": "string" },
+        "email": { "type": "string" },
+        "primary": { "type": "boolean" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["studentId", "classId", "ownerId", "fullName", "phone"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Daily attendance record for a student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "date": { "type": "string" },
+        "status": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["studentId", "classId", "ownerId", "date", "status"]
+    },
+    "Assessment": {
+      "title": "Assessment",
+      "description": "Subject learning assessment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "date": { "type": "string" },
+        "score": { "type": "number" },
+        "level": { "type": "string" },
+        "teacherComment": { "type": "string" },
+        "assessmentType": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["studentId", "classId", "ownerId", "subjectId", "level"]
+    },
+    "CompetencyEvaluation": {
+      "title": "CompetencyEvaluation",
+      "description": "Competency and quality evaluation under VN primary curriculum",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "studentId": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "criterion": { "type": "string" },
+        "type": { "type": "string" },
+        "period": { "type": "string" },
+        "level": { "type": "string" },
+        "note": { "type": "string" },
+        "evaluator": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["studentId", "classId", "ownerId", "criterion", "type", "level"]
+    },
+    "CompetitionEntry": {
+      "title": "CompetitionEntry",
+      "description": "Weekly point change for student or group competition",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "groupId": { "type": "string" },
+        "ruleId": { "type": "string" },
+        "ruleTitle": { "type": "string" },
+        "pointDelta": { "type": "number" },
+        "date": { "type": "string" },
+        "note": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "pointDelta", "date"]
+    },
+    "Task": {
+      "title": "Task",
+      "description": "Class or student assigned task",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "type": { "type": "string" },
+        "assignedAt": { "type": "string" },
+        "dueAt": { "type": "string" },
+        "audience": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "title", "dueAt"]
+    },
+    "TaskCompletion": {
+      "title": "TaskCompletion",
+      "description": "Completion state of a task by a student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "taskId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "completed": { "type": "boolean" },
+        "completedAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "taskId", "studentId", "completed"]
+    },
+    "ParentInteraction": {
+      "title": "ParentInteraction",
+      "description": "Log of parent communication and exchanges",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "contactName": { "type": "string" },
+        "phone": { "type": "string" },
+        "type": { "type": "string" },
+        "summary": { "type": "string" },
+        "status": { "type": "string" },
+        "followUpNeeded": { "type": "boolean" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "studentId", "summary", "date"]
+    },
+    "JournalEntry": {
+      "title": "JournalEntry",
+      "description": "Homeroom teacher observation journal entry",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "category": { "type": "string" },
+        "content": { "type": "string" },
+        "nextAction": { "type": "string" },
+        "date": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "category", "content", "date"]
+    },
+    "ClassEvent": {
+      "title": "ClassEvent",
+      "description": "Classroom calendar event or activity",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "title": { "type": "string" },
+        "type": { "type": "string" },
+        "date": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "location": { "type": "string" },
+        "description": { "type": "string" },
+        "participants": { "type": "string" },
+        "notes": { "type": "string" },
+        "createdAt": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "title", "date", "type"]
+    },
+    "TimetableCell": {
+      "title": "TimetableCell",
+      "description": "Schedule cell for a day and period",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "dayOfWeek": { "type": "number" },
+        "period": { "type": "number" },
+        "session": { "type": "string" },
+        "subject": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "dayOfWeek", "period", "session", "subject"]
+    },
+    "SeatingAssignment": {
+      "title": "SeatingAssignment",
+      "description": "Seating layout assignment for a student",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "row": { "type": "number" },
+        "col": { "type": "number" },
+        "position": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "studentId", "row", "col", "position"]
+    },
+    "SeatingLayoutConfig": {
+      "title": "SeatingLayoutConfig",
+      "description": "Classroom seating layout and desk structure configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "columns": { "type": "number" },
+        "rows": { "type": "number" },
+        "deskType": { "type": "string" },
+        "teacherDeskPos": { "type": "string" },
+        "boardTitle": { "type": "string" },
+        "showAvatars": { "type": "boolean" },
+        "showGroupBadge": { "type": "boolean" },
+        "showSpecialNotes": { "type": "boolean" },
+        "doorPos": { "type": "string" },
+        "windowPos": { "type": "string" },
+        "updatedAt": { "type": "string" }
+      },
+      "required": ["columns", "rows", "deskType"]
+    },
+    "TimetablePeriod": {
+      "title": "TimetablePeriod",
+      "description": "Custom timetable period configuration",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "period": { "type": "number" },
+        "session": { "type": "string" },
+        "name": { "type": "string" },
+        "time": { "type": "string" },
+        "defaultSub": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "period", "session", "time"]
+    },
+    "DutyAssignment": {
+      "title": "DutyAssignment",
+      "description": "Weekly classroom duty assignment",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "day": { "type": "string" },
+        "dayKey": { "type": "string" },
+        "assigneeType": { "type": "string" },
+        "assignedGroup": { "type": "string" },
+        "assignedStudentIds": { "type": "array" },
+        "tasks": { "type": "string" },
+        "notes": { "type": "string" }
+      },
+      "required": ["classId", "ownerId", "day", "tasks"]
+    },
+    "DailyRoutineStep": {
+      "title": "DailyRoutineStep",
+      "description": "Teacher daily classroom routine step",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "classId": { "type": "string" },
+        "ownerId": { "type": "string" },
+        "time": { "type": "string" },
+        "title": { "type": "string" },
+        "description": { "type": "string" },
+        "completedToday": { "type": "boolean" }
+      },
+      "required": ["classId", "ownerId", "time", "title"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profiles for authenticated teachers"
+    },
+    "/classes/{classId}": {
+      "schema": "Class",
+      "description": "Classroom documents owned by teacher"
+    },
+    "/students/{studentId}": {
+      "schema": "Student",
+      "description": "Student roster profiles"
+    },
+    "/parentContacts/{contactId}": {
+      "schema": "ParentContact",
+      "description": "Parent and guardian contacts"
+    },
+    "/attendanceRecords/{recordId}": {
+      "schema": "AttendanceRecord",
+      "description": "Daily student attendance records"
+    },
+    "/assessments/{assessmentId}": {
+      "schema": "Assessment",
+      "description": "Student subject assessments"
+    },
+    "/competencyEvaluations/{evaluationId}": {
+      "schema": "CompetencyEvaluation",
+      "description": "Student competency & qualities evaluations"
+    },
+    "/competitionEntries/{entryId}": {
+      "schema": "CompetitionEntry",
+      "description": "Student and group competition point transactions"
+    },
+    "/tasks/{taskId}": {
+      "schema": "Task",
+      "description": "Class assignments and tasks"
+    },
+    "/taskCompletions/{completionId}": {
+      "schema": "TaskCompletion",
+      "description": "Student task completion statuses"
+    },
+    "/parentInteractions/{interactionId}": {
+      "schema": "ParentInteraction",
+      "description": "Logs of parent communications"
+    },
+    "/journalEntries/{journalId}": {
+      "schema": "JournalEntry",
+      "description": "Teacher diary and observation logs"
+    },
+    "/classEvents/{eventId}": {
+      "schema": "ClassEvent",
+      "description": "Class activities and schedule events"
+    },
+    "/timetables/{timetableId}": {
+      "schema": "TimetableCell",
+      "description": "Timetable schedule cells for classrooms"
+    },
+    "/seatingAssignments/{assignmentId}": {
+      "schema": "SeatingAssignment",
+      "description": "Classroom student desk seating positions"
+    },
+    "/seatingConfigs/{configId}": {
+      "schema": "SeatingLayoutConfig",
+      "description": "Classroom seating layout and desk structure configuration"
+    },
+    "/timetablePeriods/{periodId}": {
+      "schema": "TimetablePeriod",
+      "description": "Classroom timetable period times"
+    },
+    "/dutyAssignments/{dutyId}": {
+      "schema": "DutyAssignment",
+      "description": "Weekly cleaning and duty assignments"
+    },
+    "/dailyRoutines/{routineId}": {
+      "schema": "DailyRoutineStep",
+      "description": "Teacher daily routines and checklist"
+    }
+  }
+}
